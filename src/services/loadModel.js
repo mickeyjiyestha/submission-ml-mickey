@@ -1,21 +1,19 @@
-const tf = require("@tensorflow/tfjs-node");
+import * as tf from "@tensorflow/tfjs-node";
 
-let model;
-
-const loadModel = async () => {
-  if (!model) {
-    try {
-      console.log("Loading model...");
-      model = await tf.loadGraphModel(
-        "https://storage.googleapis.com/model-ml-submission-mickey/model.json"
-      );
-      console.log("Model loaded successfully");
-    } catch (error) {
-      console.error("Error loading model:", error); // Log kesalahan
-      throw new Error("Model could not be loaded.");
+async function loadModel() {
+  try {
+    const modelUrl = process.env.MODEL_URL;
+    if (!modelUrl) {
+      throw new Error("MODEL_URL is not defined in environment variables.");
     }
+    console.log(`Loading model from: ${modelUrl}`);
+    const model = await tf.loadGraphModel(modelUrl);
+    console.log("Model loaded successfully.");
+    return model;
+  } catch (error) {
+    console.error("Error loading the model:", error.message);
+    throw error;
   }
-  return model;
-};
+}
 
-module.exports = loadModel;
+export { loadModel };

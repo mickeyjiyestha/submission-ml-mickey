@@ -1,53 +1,48 @@
-// src/services/inferenceService.js
-const tf = require("@tensorflow/tfjs-node");
-const loadModel = require("./loadModel");
+import { InputError } from "../exceptions/InputError.js";
+import * as tf from "@tensorflow/tfjs-node";
 
-const inferenceService = async (imageBuffer) => {
+async function predictClassification(model, imageBuffer) {
   try {
-    const model = await loadModel();
+    // Decode image buffer dan preprocessing
     const tensor = tf.node
-      .decodeImage(imageBuffer, 3)
-      .resizeBilinear([224, 224])
-      .expandDims(0)
+      .decodeJpeg(imageBuffer)
+      .resizeNearestNeighbor([224, 224]) // Ubah ukuran ke 224x224
+      .expandDims(0) // Tambahkan dimensi batch
       .toFloat()
-      .div(255);
+      .div(tf.scalar(255)); // Normalisasi nilai piksel
 
-    const predictions = model.predict(tensor);
-    const scores = await predictions.data(); // Ambil semua skor prediksi
-    console.log("Scores:", scores); // Log skor untuk debugging
+    // Lakukan prediksi
+    const prediction = model.predict(tensor);
+    const scores = await prediction.data(); // Ambil skor sebagai array
 
-    // Jika hanya ada satu skor, gunakan threshold untuk menentukan label
-    let confidenceScore;
-    let label;
+    tensor.dispose(); // Bebaskan memori tensor
+    prediction.dispose(); // Bebaskan memori hasil prediksi
 
-    if (scores.length === 1) {
-      confidenceScore = scores[0] * 100; // Konversi ke persen
-      label = confidenceScore > 40 ? "Cancer" : "Non-cancer"; // Threshold 60%
+    // Log untuk melihat skor hasil prediksi
+    console.log("Prediction Scores:", scores);
+
+    // Proses hasil prediksi
+    const resultScore = Math.max(...scores) * 100; // Skor tertinggi
+    const roundedScore = parseFloat(resultScore.toFixed(1)); // Ambil satu angka di belakang koma
+    let result, suggestion;
+
+    // Logika klasifikasi berdasarkan score
+    if (roundedScore <= 57.9) {
+      result = "Non-cancer"; // Jika score <= 57.9
+      suggestion = "Penyakit kanker tidak terdeteksi.";
     } else {
-      confidenceScore = Math.max(...scores) * 100; // Ambil skor tertinggi dan konversi ke persen
-      const classIndex = scores.indexOf(confidenceScore); // Indeks dari skor tertinggi
-
-      const classes = [
-        "Non-cancer", // Indeks 0
-        "Cancer", // Indeks 1
-      ];
-
-      label = classes[classIndex]; // Ambil label berdasarkan indeks
+      result = "Cancer"; // Jika score > 57.9
+      suggestion = "Segera periksa ke dokter!";
     }
 
-    console.log("Confidence Score:", confidenceScore);
-    console.log("Label:", label);
+    // Log untuk debugging
+    console.log("Prediction Results:", { roundedScore, result });
 
-    // Pastikan label tidak undefined
-    if (label === undefined) {
-      throw new Error("Label is undefined");
-    }
-
-    return { confidenceScore, label }; // Kembalikan confidenceScore dan label
+    return { resultScore: roundedScore, result, suggestion };
   } catch (error) {
-    console.error("Error in inferenceService:", error); // Log kesalahan
-    throw new Error("Inference failed: " + error.message); // Lempar kesalahan dengan pesan yang lebih jelas
+    console.error("Error in prediction:", error.message);
+    throw new InputError("Terjadi kesalahan dalam melakukan prediksi");
   }
-};
+}
 
-module.exports = inferenceService;
+export default predictClassification;

@@ -1,9 +1,10 @@
-class InputError extends Error {
+import ClientError from "./ClientError.js";
+
+class InputError extends ClientError {
   constructor(message) {
     super(message);
     this.name = "InputError";
-    this.output = { statusCode: 400 };
   }
 }
 
-module.exports = InputError;
+export { InputError };
